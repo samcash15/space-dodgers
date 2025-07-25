@@ -80,11 +80,11 @@ public class BossAsteroid extends Asteroid {
         g2d.setStroke(new BasicStroke(2));
         g2d.drawPolygon(xPoints, yPoints, 12);
         
-        // Draw health bar above boss using sprites
-        drawHealthBarSprite(g2d);
-        
-        // Restore transform
+        // Restore transform before drawing health bar
         g2d.setTransform(oldTransform);
+        
+        // Draw health bar above boss using sprites (outside rotation)
+        drawHealthBarSprite(g2d);
     }
     
     public boolean takeDamage() {
@@ -112,54 +112,36 @@ public class BossAsteroid extends Asteroid {
     
     private void drawHealthBarSprite(Graphics2D g2d) {
         int barWidth = getSize() + 20;
-        int barHeight = 8;
-        int barX = -10;
-        int barY = -barHeight - 15;
+        int barHeight = 6;
+        int barX = getX() - 10;
+        int barY = getY() - barHeight - 10;
         
         double healthPercent = (double)health / maxHealth;
         
+        // Draw background (dark gray)
+        g2d.setColor(Color.DARK_GRAY);
+        g2d.fillRect(barX, barY, barWidth, barHeight);
+        
         // Choose health bar color based on health percentage
-        String barType;
-        if (healthPercent > 0.6) {
-            barType = "horizontal_bar_green";
-        } else if (healthPercent > 0.3) {
-            barType = "horizontal_bar_yellow";
-        } else {
-            barType = "horizontal_bar_red";
+        Color healthColor = Color.GREEN;
+        if (healthPercent <= 0.25) {
+            healthColor = Color.RED;
+        } else if (healthPercent <= 0.5) {
+            healthColor = Color.ORANGE;
+        } else if (healthPercent <= 0.75) {
+            healthColor = Color.YELLOW;
         }
         
-        // Load health bar sprite
-        BufferedImage healthBarSprite = SpriteLoader.getHealthBar(barType);
-        
-        if (healthBarSprite != null) {
-            // Draw background (grey bar)
-            BufferedImage greyBar = SpriteLoader.getHealthBar("horizontal_bar_grey");
-            if (greyBar != null) {
-                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-                g2d.drawImage(greyBar, barX, barY, barWidth, barHeight, null);
-            }
-            
-            // Draw health portion
-            int healthWidth = (int)(barWidth * healthPercent);
-            if (healthWidth > 0) {
-                g2d.drawImage(healthBarSprite, barX, barY, healthWidth, barHeight, 
-                            0, 0, (int)(healthBarSprite.getWidth() * healthPercent), 
-                            healthBarSprite.getHeight(), null);
-            }
-        } else {
-            // Fallback to original health bar if sprites fail
-            g2d.setColor(Color.DARK_GRAY);
-            g2d.fillRect(barX, barY, barWidth, barHeight);
-            
-            Color healthColor = healthPercent > 0.5 ? Color.GREEN : 
-                               healthPercent > 0.25 ? Color.YELLOW : Color.RED;
+        // Draw health portion
+        int healthWidth = (int)(barWidth * healthPercent);
+        if (healthWidth > 0) {
             g2d.setColor(healthColor);
-            g2d.fillRect(barX + 1, barY + 1, (int)((barWidth - 2) * healthPercent), barHeight - 2);
-            
-            g2d.setColor(Color.WHITE);
-            g2d.setStroke(new BasicStroke(1));
-            g2d.drawRect(barX, barY, barWidth, barHeight);
+            g2d.fillRect(barX + 1, barY + 1, healthWidth - 2, barHeight - 2);
         }
+        
+        // Draw border
+        g2d.setColor(Color.WHITE);
+        g2d.setStroke(new BasicStroke(1));
+        g2d.drawRect(barX, barY, barWidth, barHeight);
     }
 }

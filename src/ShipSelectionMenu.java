@@ -118,7 +118,23 @@ public class ShipSelectionMenu extends JPanel implements KeyListener {
         String confirm = "Press SPACE to start your adventure!";
         fm = g2d.getFontMetrics();
         int confirmX = (WIDTH - fm.stringWidth(confirm)) / 2;
-        g2d.drawString(confirm, confirmX, HEIGHT - 80);
+        g2d.drawString(confirm, confirmX, HEIGHT - 120);
+        
+        // Achievements option
+        g2d.setColor(Color.CYAN);
+        g2d.setFont(new Font("Arial", Font.BOLD, 20));
+        String achievements = "Press A for Achievements";
+        fm = g2d.getFontMetrics();
+        int achievementsX = (WIDTH - fm.stringWidth(achievements)) / 2;
+        g2d.drawString(achievements, achievementsX, HEIGHT - 80);
+        
+        // Additional controls
+        g2d.setColor(Color.GRAY);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 16));
+        String controls = "← → to select ship";
+        fm = g2d.getFontMetrics();
+        int controlsX = (WIDTH - fm.stringWidth(controls)) / 2;
+        g2d.drawString(controls, controlsX, HEIGHT - 40);
     }
     
     
@@ -149,6 +165,8 @@ public class ShipSelectionMenu extends JPanel implements KeyListener {
         } else if (key == KeyEvent.VK_SPACE) {
             menuActive = false;
             game.startGameWithSelectedShip(getSelectedShip());
+        } else if (key == KeyEvent.VK_A) {
+            game.showAchievements();
         }
     }
     

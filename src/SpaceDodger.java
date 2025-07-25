@@ -23,7 +23,16 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     private ArrayList<EnemyShip> enemyShips;
     private ArrayList<EnemyBullet> enemyBullets;
     private ArrayList<BackgroundStar> backgroundStars;
+    private ArrayList<AchievementNotification> achievementNotifications;
     private Random random;
+    
+    // Achievement tracking
+    private AchievementManager achievementManager;
+    private int totalEnemyKills;
+    private int totalAsteroidDestroyed;
+    private int totalBossKills;
+    private int totalDamageTaken;
+    private int totalShotsFired;
     
     private int score;
     private int asteroidSpawnCounter;
@@ -38,10 +47,11 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     // Game states
     private GameState currentState;
     private ShipSelectionMenu shipMenu;
+    private AchievementViewer achievementViewer;
     private String selectedShipType;
     
     private enum GameState {
-        MENU, PLAYING, PAUSED, GAME_OVER
+        MENU, ACHIEVEMENTS, PLAYING, PAUSED, GAME_OVER
     }
     
     public SpaceDodger() {
@@ -58,6 +68,22 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         shipMenu = new ShipSelectionMenu(this);
         random = new Random();
         
+        // Initialize achievement system
+        if (achievementManager == null) {
+            achievementManager = new AchievementManager();
+            System.out.println("Achievement Manager initialized");
+        }
+        if (achievementNotifications == null) {
+            achievementNotifications = new ArrayList<>();
+        }
+        if (achievementViewer == null) {
+            achievementViewer = new AchievementViewer(this, achievementManager);
+        }
+        
+        // Stop existing timer before creating new one
+        if (timer != null) {
+            timer.stop();
+        }
         timer = new Timer(DELAY, this);
         timer.start();
     }
@@ -65,6 +91,14 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     public void startGameWithSelectedShip(String shipType) {
         this.selectedShipType = shipType;
         initGame();
+    }
+    
+    public void showAchievements() {
+        currentState = GameState.ACHIEVEMENTS;
+    }
+    
+    public void returnToMenu() {
+        currentState = GameState.MENU;
     }
     
     private void initGame() {
@@ -78,6 +112,14 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         explosions = new ArrayList<>();
         enemyShips = new ArrayList<>();
         enemyBullets = new ArrayList<>();
+        
+        // Initialize achievement notifications if not already done
+        if (achievementNotifications == null) {
+            achievementNotifications = new ArrayList<>();
+        } else {
+            // Clear any existing notifications when starting new game
+            achievementNotifications.clear();
+        }
         
         // Initialize background stars
         backgroundStars = new ArrayList<>();
@@ -94,6 +136,18 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         gameRunning = true;
         gameOver = false;
         shootingPressed = false;
+        
+        // Reset achievement tracking variables
+        totalEnemyKills = 0;
+        totalAsteroidDestroyed = 0;
+        totalBossKills = 0;
+        totalDamageTaken = 0;
+        totalShotsFired = 0;
+        
+        // Debug: Check if achievement manager is ready
+        if (achievementManager != null) {
+            System.out.println("Achievement manager ready in game");
+        }
     }
     
     @Override
@@ -103,6 +157,9 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         switch (currentState) {
             case MENU:
                 shipMenu.paintComponent(g);
+                break;
+            case ACHIEVEMENTS:
+                achievementViewer.paintComponent(g);
                 break;
             case PLAYING:
                 if (gameRunning && !gameOver) {
@@ -117,6 +174,9 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 drawGameOver(g);
                 break;
         }
+        
+        // Always draw achievement notifications on top of everything
+        drawAchievementNotifications(g);
     }
     
     private void drawGame(Graphics g) {
@@ -240,7 +300,18 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         g2d.drawString(menuText, x, HEIGHT / 2 + 60);
     }
     
+    private void drawAchievementNotifications(Graphics g) {
+        // Draw achievement notifications
+        for (int i = 0; i < achievementNotifications.size(); i++) {
+            AchievementNotification notification = achievementNotifications.get(i);
+            notification.draw(g, WIDTH - 370, 20 + i * 57);
+        }
+    }
+    
     private void update() {
+        // Always update achievement notifications regardless of game state
+        updateAchievementNotifications();
+        
         if (currentState == GameState.MENU) {
             return;
         }
@@ -251,6 +322,10 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         
         if (currentState == GameState.GAME_OVER) {
             return;
+        }
+        
+        if (currentState == GameState.ACHIEVEMENTS) {
+            return; // Don't update game logic when viewing achievements
         }
         
         if (!gameRunning || gameOver) {
@@ -269,6 +344,13 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         // Handle shooting
         if (shootingPressed && player.canShoot()) {
             bullets.add(new Bullet(player.getX() + player.getWidth() / 2 - 2, player.getY()));
+            totalShotsFired++;
+            if (achievementManager != null) {
+                achievementManager.updateProgress(Achievement.AchievementType.SHOTS_FIRED, 1);
+            }
+            if (totalShotsFired == 1) {
+                System.out.println("First shot fired! Shots: " + totalShotsFired);
+            }
         }
         
         // Update explosions
@@ -308,6 +390,10 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                             explosions.add(new Explosion(asteroid.getX(), asteroid.getY(), asteroid.getSize()));
                             asteroidIter.remove();
                             score += 100; // Big bonus for destroying boss
+                            totalBossKills++;
+                            if (achievementManager != null) {
+                                achievementManager.updateProgress(Achievement.AchievementType.BOSS_KILLS, 1);
+                            }
                         }
                         bulletIter.remove();
                         break;
@@ -317,6 +403,10 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                         asteroidIter.remove();
                         bulletIter.remove();
                         score += 25; // Extra points for shooting
+                        totalAsteroidDestroyed++;
+                        if (achievementManager != null) {
+                            achievementManager.updateProgress(Achievement.AchievementType.ASTEROID_DESTROYED, 1);
+                        }
                         break;
                     }
                 }
@@ -333,6 +423,11 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                                                    Math.max(enemy.getWidth(), enemy.getHeight())));
                         enemyIter.remove();
                         score += enemy.getPointValue();
+                        totalEnemyKills++;
+                        System.out.println("Enemy ship killed! Total enemy kills: " + totalEnemyKills);
+                        if (achievementManager != null) {
+                            achievementManager.updateProgress(Achievement.AchievementType.ENEMY_KILLS, 1);
+                        }
                     }
                     bulletIter.remove();
                     break;
@@ -352,10 +447,23 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 score += 10; // Points for dodging
             }
             
-            // Check collision with player - asteroids deal 25 damage (1/4 of health)
+            // Check collision with player
             if (checkCollision(player, asteroid)) {
-                if (player.takeDamage(25)) {
+                int damage;
+                if (asteroid instanceof BossAsteroid) {
+                    // Boss asteroids cause instant death
+                    damage = player.getMaxHealth();
+                } else {
+                    // Regular asteroids deal 25 damage (1/4 of health)
+                    damage = 25;
+                }
+                
+                if (player.takeDamage(damage)) {
                     gameOver = true;
+                }
+                totalDamageTaken += damage;
+                if (achievementManager != null) {
+                    achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, damage);
                 }
                 // Remove asteroid on hit to prevent continuous damage
                 iter.remove();
@@ -402,6 +510,10 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 if (player.takeDamage(50)) {
                     gameOver = true;
                 }
+                totalDamageTaken += 50;
+                if (achievementManager != null) {
+                    achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, 50);
+                }
                 // Remove enemy ship on collision
                 enemyShipIter.remove();
                 explosions.add(new Explosion(enemyShip.getX(), enemyShip.getY(), 
@@ -434,6 +546,10 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 if (player.takeDamage(50)) {
                     gameOver = true;
                 }
+                totalDamageTaken += 50;
+                if (achievementManager != null) {
+                    achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, 50);
+                }
                 enemyBulletIter.remove();
             }
         }
@@ -457,8 +573,8 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         
         // Spawn boss asteroids
         bossSpawnCounter++;
-        if (bossSpawnCounter >= 600 && difficulty >= 2) { // Spawn boss every ~10 seconds after level 2
-            if (random.nextInt(100) < 20) { // 20% chance
+        if (bossSpawnCounter >= 240 && difficulty >= 1) { // Spawn boss every ~4 seconds starting at level 1
+            if (random.nextInt(100) < (30 + difficulty * 5)) { // 35% chance at level 1, increasing with difficulty
                 spawnBossAsteroid();
             }
             bossSpawnCounter = 0;
@@ -476,6 +592,45 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         // Increase difficulty
         if (score > 0 && score % 200 == 0) {
             difficulty = score / 200 + 1;
+        }
+        
+        // Update achievement progress during gameplay
+        if (achievementManager != null) {
+            achievementManager.setProgress(Achievement.AchievementType.SCORE, score);
+            achievementManager.setProgress(Achievement.AchievementType.SURVIVAL, difficulty);
+        }
+    }
+    
+    private void updateAchievementNotifications() {
+        // Check for new achievement unlocks and create notifications
+        if (achievementManager != null) {
+            java.util.List<Achievement> recentUnlocks = achievementManager.getRecentUnlocks();
+            if (recentUnlocks.size() > 0) {
+                System.out.println("Found " + recentUnlocks.size() + " recent unlocks");
+            }
+            for (Achievement achievement : recentUnlocks) {
+                AchievementNotification notification = new AchievementNotification(achievement);
+                achievementNotifications.add(notification);
+                System.out.println("Achievement unlocked: " + achievement.getName());
+                System.out.println("Created notification. Total notifications: " + achievementNotifications.size());
+            }
+        } else {
+            System.out.println("Achievement manager is null!");
+        }
+        
+        // Update achievement notifications
+        Iterator<AchievementNotification> notificationIter = achievementNotifications.iterator();
+        while (notificationIter.hasNext()) {
+            AchievementNotification notification = notificationIter.next();
+            notification.update();
+            if (notification.isFinished()) {
+                notificationIter.remove();
+            }
+        }
+        
+        // Adjust notification positions to stack properly with tighter spacing
+        for (int i = 0; i < achievementNotifications.size(); i++) {
+            achievementNotifications.get(i).setYOffset(i * 57); // 75 * 0.75 = ~57
         }
     }
     
@@ -525,6 +680,8 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         
         if (currentState == GameState.MENU) {
             shipMenu.keyPressed(e);
+        } else if (currentState == GameState.ACHIEVEMENTS) {
+            achievementViewer.keyPressed(e);
         } else if (currentState == GameState.PLAYING) {
             if (key == KeyEvent.VK_LEFT) {
                 player.setMovingLeft(true);
