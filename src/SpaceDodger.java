@@ -4,13 +4,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
 
 public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
-    private static final int WIDTH = 800;
-    private static final int HEIGHT = 600;
+    private static final int WIDTH = 1200;
+    private static final int HEIGHT = 800;
     private static final int DELAY = 16; // ~60 FPS
     
     private Timer timer;
@@ -19,16 +20,29 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     private ArrayList<Bullet> bullets;
     private ArrayList<PowerUp> powerUps;
     private ArrayList<Explosion> explosions;
+    private ArrayList<EnemyShip> enemyShips;
+    private ArrayList<EnemyBullet> enemyBullets;
+    private ArrayList<BackgroundStar> backgroundStars;
     private Random random;
     
     private int score;
     private int asteroidSpawnCounter;
     private int powerUpSpawnCounter;
     private int bossSpawnCounter;
+    private int enemySpawnCounter;
     private int difficulty;
     private boolean gameRunning;
     private boolean gameOver;
     private boolean shootingPressed = false;
+    
+    // Game states
+    private GameState currentState;
+    private ShipSelectionMenu shipMenu;
+    private String selectedShipType;
+    
+    private enum GameState {
+        MENU, PLAYING, PAUSED, GAME_OVER
+    }
     
     public SpaceDodger() {
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
@@ -36,48 +50,97 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         setFocusable(true);
         addKeyListener(this);
         
+        initMenu();
+    }
+    
+    private void initMenu() {
+        currentState = GameState.MENU;
+        shipMenu = new ShipSelectionMenu(this);
+        random = new Random();
+        
+        timer = new Timer(DELAY, this);
+        timer.start();
+    }
+    
+    public void startGameWithSelectedShip(String shipType) {
+        this.selectedShipType = shipType;
         initGame();
     }
     
     private void initGame() {
-        player = new Player(WIDTH / 2 - 25, HEIGHT - 100);
+        currentState = GameState.PLAYING;
+        player = new Player(WIDTH / 2 - 25, HEIGHT - 200, selectedShipType);
+        player.setHasBlaster(true); // Start with blaster ability
+        player.resetHealth(); // Reset player health
         asteroids = new ArrayList<>();
         bullets = new ArrayList<>();
         powerUps = new ArrayList<>();
         explosions = new ArrayList<>();
-        random = new Random();
+        enemyShips = new ArrayList<>();
+        enemyBullets = new ArrayList<>();
+        
+        // Initialize background stars
+        backgroundStars = new ArrayList<>();
+        for (int i = 0; i < 50; i++) { // Subtle amount of stars
+            backgroundStars.add(new BackgroundStar(WIDTH, HEIGHT));
+        }
         
         score = 0;
         asteroidSpawnCounter = 0;
         powerUpSpawnCounter = 0;
         bossSpawnCounter = 0;
+        enemySpawnCounter = 0;
         difficulty = 1;
         gameRunning = true;
         gameOver = false;
         shootingPressed = false;
-        
-        timer = new Timer(DELAY, this);
-        timer.start();
     }
     
     @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
         
-        if (gameRunning && !gameOver) {
-            drawGame(g);
-        } else if (gameOver) {
-            drawGameOver(g);
+        switch (currentState) {
+            case MENU:
+                shipMenu.paintComponent(g);
+                break;
+            case PLAYING:
+                if (gameRunning && !gameOver) {
+                    drawGame(g);
+                }
+                break;
+            case PAUSED:
+                drawGame(g); // Draw game in background
+                drawPauseOverlay(g); // Draw pause overlay on top
+                break;
+            case GAME_OVER:
+                drawGameOver(g);
+                break;
         }
     }
     
     private void drawGame(Graphics g) {
-        // Draw stars background
-        g.setColor(Color.WHITE);
-        for (int i = 0; i < 50; i++) {
-            int x = random.nextInt(WIDTH);
-            int y = random.nextInt(HEIGHT);
-            g.fillRect(x, y, 2, 2);
+        Graphics2D g2d = (Graphics2D) g;
+        
+        // Draw background sprite
+        BufferedImage background = SpriteLoader.getBackground("background-black");
+        if (background != null) {
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                               RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2d.drawImage(background, 0, 0, WIDTH, HEIGHT, null);
+        } else {
+            // Fallback to starfield
+            g2d.setColor(Color.WHITE);
+            for (int i = 0; i < 50; i++) {
+                int x = random.nextInt(WIDTH);
+                int y = random.nextInt(HEIGHT);
+                g2d.fillRect(x, y, 2, 2);
+            }
+        }
+        
+        // Draw moving background stars
+        for (BackgroundStar star : backgroundStars) {
+            star.draw(g);
         }
         
         // Draw player
@@ -93,6 +156,11 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
             bullet.draw(g);
         }
         
+        // Draw enemy bullets
+        for (EnemyBullet enemyBullet : enemyBullets) {
+            enemyBullet.draw(g);
+        }
+        
         // Draw power-ups
         for (PowerUp powerUp : powerUps) {
             powerUp.draw(g);
@@ -103,14 +171,20 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
             explosion.draw(g);
         }
         
-        // Draw score
+        // Draw enemy ships
+        for (EnemyShip enemyShip : enemyShips) {
+            enemyShip.draw(g);
+        }
+        
+        // Draw score and health
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.BOLD, 20));
         g.drawString("Score: " + score, 10, 30);
         g.drawString("Level: " + difficulty, 10, 60);
+        g.drawString("Health: " + player.getCurrentHealth() + "/" + player.getMaxHealth(), 10, 90);
         if (player.hasBlaster()) {
             g.setColor(Color.YELLOW);
-            g.drawString("BLASTER ACTIVE", 10, 90);
+            g.drawString("BLASTER ACTIVE", 10, 120);
         }
     }
     
@@ -136,8 +210,58 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         g.drawString(restartText, x, HEIGHT / 2 + 50);
     }
     
+    private void drawPauseOverlay(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        
+        // Semi-transparent overlay
+        g2d.setColor(new Color(0, 0, 0, 150));
+        g2d.fillRect(0, 0, WIDTH, HEIGHT);
+        
+        // "PAUSED" text
+        g2d.setColor(Color.CYAN);
+        g2d.setFont(new Font("Arial", Font.BOLD, 72));
+        String pausedText = "PAUSED";
+        FontMetrics fm = g2d.getFontMetrics();
+        int x = (WIDTH - fm.stringWidth(pausedText)) / 2;
+        g2d.drawString(pausedText, x, HEIGHT / 2 - 50);
+        
+        // Instructions
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(new Font("Arial", Font.PLAIN, 24));
+        String resumeText = "Press ESC to resume";
+        fm = g2d.getFontMetrics();
+        x = (WIDTH - fm.stringWidth(resumeText)) / 2;
+        g2d.drawString(resumeText, x, HEIGHT / 2 + 20);
+        
+        g2d.setFont(new Font("Arial", Font.PLAIN, 20));
+        String menuText = "Press M to return to menu";
+        fm = g2d.getFontMetrics();
+        x = (WIDTH - fm.stringWidth(menuText)) / 2;
+        g2d.drawString(menuText, x, HEIGHT / 2 + 60);
+    }
+    
     private void update() {
-        if (!gameRunning || gameOver) return;
+        if (currentState == GameState.MENU) {
+            return;
+        }
+        
+        if (currentState == GameState.PAUSED) {
+            return; // Don't update game logic when paused
+        }
+        
+        if (currentState == GameState.GAME_OVER) {
+            return;
+        }
+        
+        if (!gameRunning || gameOver) {
+            currentState = GameState.GAME_OVER;
+            return;
+        }
+        
+        // Update background stars
+        for (BackgroundStar star : backgroundStars) {
+            star.update(HEIGHT);
+        }
         
         // Update player
         player.update();
@@ -197,6 +321,23 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                     }
                 }
             }
+            
+            // Check collision with enemy ships
+            Iterator<EnemyShip> enemyIter = enemyShips.iterator();
+            while (enemyIter.hasNext()) {
+                EnemyShip enemy = enemyIter.next();
+                if (bullet.getBounds().intersects(enemy.getBounds())) {
+                    if (enemy.takeDamage()) {
+                        // Enemy destroyed
+                        explosions.add(new Explosion(enemy.getX(), enemy.getY(), 
+                                                   Math.max(enemy.getWidth(), enemy.getHeight())));
+                        enemyIter.remove();
+                        score += enemy.getPointValue();
+                    }
+                    bulletIter.remove();
+                    break;
+                }
+            }
         }
         
         // Update asteroids
@@ -211,9 +352,14 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 score += 10; // Points for dodging
             }
             
-            // Check collision with player
+            // Check collision with player - asteroids deal 25 damage (1/4 of health)
             if (checkCollision(player, asteroid)) {
-                gameOver = true;
+                if (player.takeDamage(25)) {
+                    gameOver = true;
+                }
+                // Remove asteroid on hit to prevent continuous damage
+                iter.remove();
+                explosions.add(new Explosion(asteroid.getX(), asteroid.getY(), asteroid.getSize()));
             }
         }
         
@@ -236,6 +382,59 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 }
                 powerUpIter.remove();
                 score += 50; // Bonus points for power-up
+            }
+        }
+        
+        // Update enemy ships
+        Iterator<EnemyShip> enemyShipIter = enemyShips.iterator();
+        while (enemyShipIter.hasNext()) {
+            EnemyShip enemyShip = enemyShipIter.next();
+            enemyShip.update();
+            
+            // Remove enemy ships that go off screen
+            if (enemyShip.getY() > HEIGHT) {
+                enemyShipIter.remove();
+                continue;
+            }
+            
+            // Check collision with player - enemy ships deal 50 damage (1/2 of health)
+            if (player.getBounds().intersects(enemyShip.getBounds())) {
+                if (player.takeDamage(50)) {
+                    gameOver = true;
+                }
+                // Remove enemy ship on collision
+                enemyShipIter.remove();
+                explosions.add(new Explosion(enemyShip.getX(), enemyShip.getY(), 
+                                           Math.max(enemyShip.getWidth(), enemyShip.getHeight())));
+            }
+            
+            // Enemy shooting
+            if (enemyShip.canShoot()) {
+                int bulletX = enemyShip.getX() + enemyShip.getWidth() / 2 - 3;
+                int bulletY = (int) (enemyShip.getY() + enemyShip.getHeight() - 10); // Spawn from front of ship
+                String laserType = enemyShip.getLaserType();
+                enemyBullets.add(new EnemyBullet(bulletX, bulletY, laserType));
+            }
+        }
+        
+        // Update enemy bullets
+        Iterator<EnemyBullet> enemyBulletIter = enemyBullets.iterator();
+        while (enemyBulletIter.hasNext()) {
+            EnemyBullet enemyBullet = enemyBulletIter.next();
+            enemyBullet.update();
+            
+            // Remove enemy bullets that go off screen
+            if (enemyBullet.getY() > HEIGHT) {
+                enemyBulletIter.remove();
+                continue;
+            }
+            
+            // Check collision with player - enemy bullets deal 50 damage (1/2 of health)
+            if (player.getBounds().intersects(enemyBullet.getBounds())) {
+                if (player.takeDamage(50)) {
+                    gameOver = true;
+                }
+                enemyBulletIter.remove();
             }
         }
         
@@ -265,6 +464,15 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
             bossSpawnCounter = 0;
         }
         
+        // Spawn enemy ships
+        enemySpawnCounter++;
+        if (enemySpawnCounter >= 120 && difficulty >= 1) { // Spawn enemy every ~2 seconds
+            if (random.nextInt(100) < 40) { // 40% chance
+                spawnEnemyShip();
+            }
+            enemySpawnCounter = 0;
+        }
+        
         // Increase difficulty
         if (score > 0 && score % 200 == 0) {
             difficulty = score / 200 + 1;
@@ -290,6 +498,13 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         powerUps.add(new PowerUp(x, -30, PowerUp.PowerUpType.BLASTER));
     }
     
+    private void spawnEnemyShip() {
+        int x = random.nextInt(WIDTH - 60);
+        String[] enemyTypes = SpriteLoader.getAvailableEnemyShips();
+        String enemyType = enemyTypes[random.nextInt(enemyTypes.length)];
+        enemyShips.add(new EnemyShip(x, -40, enemyType));
+    }
+    
     private boolean checkCollision(Player player, Asteroid asteroid) {
         Rectangle playerBounds = new Rectangle(player.getX(), player.getY(), 
                                                player.getWidth(), player.getHeight());
@@ -308,15 +523,27 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     public void keyPressed(KeyEvent e) {
         int key = e.getKeyCode();
         
-        if (key == KeyEvent.VK_LEFT) {
-            player.setMovingLeft(true);
-        } else if (key == KeyEvent.VK_RIGHT) {
-            player.setMovingRight(true);
-        } else if (key == KeyEvent.VK_SPACE) {
-            if (gameOver) {
-                initGame();
-            } else if (player.hasBlaster()) {
+        if (currentState == GameState.MENU) {
+            shipMenu.keyPressed(e);
+        } else if (currentState == GameState.PLAYING) {
+            if (key == KeyEvent.VK_LEFT) {
+                player.setMovingLeft(true);
+            } else if (key == KeyEvent.VK_RIGHT) {
+                player.setMovingRight(true);
+            } else if (key == KeyEvent.VK_SPACE) {
                 shootingPressed = true;
+            } else if (key == KeyEvent.VK_ESCAPE) {
+                currentState = GameState.PAUSED;
+            }
+        } else if (currentState == GameState.PAUSED) {
+            if (key == KeyEvent.VK_ESCAPE) {
+                currentState = GameState.PLAYING;
+            } else if (key == KeyEvent.VK_M) {
+                initMenu();
+            }
+        } else if (currentState == GameState.GAME_OVER) {
+            if (key == KeyEvent.VK_SPACE) {
+                initMenu();
             }
         }
     }
@@ -325,12 +552,23 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     public void keyReleased(KeyEvent e) {
         int key = e.getKeyCode();
         
-        if (key == KeyEvent.VK_LEFT) {
-            player.setMovingLeft(false);
-        } else if (key == KeyEvent.VK_RIGHT) {
-            player.setMovingRight(false);
-        } else if (key == KeyEvent.VK_SPACE) {
-            shootingPressed = false;
+        if (currentState == GameState.PLAYING) {
+            if (key == KeyEvent.VK_LEFT) {
+                player.setMovingLeft(false);
+            } else if (key == KeyEvent.VK_RIGHT) {
+                player.setMovingRight(false);
+            } else if (key == KeyEvent.VK_SPACE) {
+                shootingPressed = false;
+            }
+        } else if (currentState == GameState.PAUSED) {
+            // Stop any movement when game is paused
+            if (key == KeyEvent.VK_LEFT) {
+                player.setMovingLeft(false);
+            } else if (key == KeyEvent.VK_RIGHT) {
+                player.setMovingRight(false);
+            } else if (key == KeyEvent.VK_SPACE) {
+                shootingPressed = false;
+            }
         }
     }
     
