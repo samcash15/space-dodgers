@@ -1,19 +1,25 @@
 # 🚀 Space Dodger Game 🌌
 
-A thrilling 2D space dodging game built with Java Swing! 🎮
+A thrilling 2D space dodging game built with Java Swing featuring sprite-based graphics and ship customization! 🎮
 
 ## 🎮 How to Play
 
+- **Ship Selection**: Choose your ship from multiple colorful options in the main menu 🚁
 - Use **LEFT** ⬅️ and **RIGHT** ➡️ arrow keys to move your spaceship 🛸
-- Collect **yellow power-ups** ⚡ to get a blaster weapon 🔫
-- Press and hold **SPACE** 🚀 to shoot when you have a blaster
-- Dodge the falling asteroids ☄️ or destroy them with your blaster 💥
+- **Health System**: You have 100 health points - survive multiple hits! ❤️
+  - Asteroids deal 25 damage (1/4 health) ☄️
+  - Enemy ships and lasers deal 50 damage (1/2 health) 🚢💥
+- Your ship starts with a blaster weapon - hold **SPACE** 🚀 to shoot continuously 🔫
+- Dodge or destroy falling asteroids and enemy ships 💥
+- **Enemy Ships**: Fight AI-controlled ships that shoot colored lasers matching their hull! 🛸⚔️
 - Score points for:
   - Dodging asteroids: 10 points 🏃‍♂️
   - Shooting regular asteroids: 25 points 🎯
+  - Destroying enemy ships: 30-75 points (based on type) 🎯
   - Destroying boss asteroids: 100 points 💀
   - Collecting power-ups: 50 points ✨
 - The game gets progressively harder as your score increases 📈
+- Press **ESC** to pause/resume game ⏸️
 - Press **SPACE** to restart after game over 🔄
 
 ## ⚙️ How to Run
@@ -31,23 +37,29 @@ A thrilling 2D space dodging game built with Java Swing! 🎮
 
 ## ✨ Game Features
 
+- **Sprite-Based Graphics**: Professional pixel art assets for all game elements 🎨
+- **Ship Selection Menu**: Choose from multiple player ships with unique designs 🚁
+- **Health System**: Damage-based gameplay with visual health bars ❤️
+- **Enemy AI**: Smart enemy ships with varied movement patterns and shooting 🤖
+- **Colored Laser System**: Enemy ships shoot lasers matching their ship colors 🌈
 - Smooth 60 FPS gameplay 🎯
 - Progressive difficulty system 📊
 - Score tracking 🏆
-- Power-up system with collectible blaster weapon ⚡🔫
-- Shooting mechanics to destroy asteroids 💥
-- **Boss Asteroids**: Large, multi-hit enemies with health bars and spikes 👹⚔️
-- **Explosion Effects**: Particle-based explosions when asteroids are destroyed 🎆
-- Visual effects (engine flames 🔥, rotating asteroids ☄️, pulsing power-ups ✨, bullet trails 🌟)
+- **Boss Asteroids**: Large, multi-hit enemies with sprite-based health bars 👹⚔️
+- **Explosion Effects**: Particle-based explosions when enemies are destroyed 🎆
+- **Dynamic Background**: Moving stars overlay on space background 🌟
+- **Pause System**: Pause and resume gameplay anytime ⏸️
+- Visual effects (animated thrusters 🔥, rotating asteroids ☄️, hit flash effects ⚡)
 - Game over and restart functionality 🔄
 - Responsive keyboard controls 🎮
 
 ## 🎮 Controls
 
-- **Left Arrow** ⬅️: Move spaceship left 🛸
-- **Right Arrow** ➡️: Move spaceship right 🛸
+- **Arrow Keys** ⬅️➡️: Move spaceship left/right 🛸
 - **Space** 🚀: 
-  - Hold to shoot (when you have a blaster) 🔫💥
+  - Hold to shoot continuously 🔫💥
   - Press to restart (when game over) 🔄
+- **ESC**: Pause/resume game ⏸️
+- **Mouse**: Click ship options in menu 🖱️
 
 🌟 Enjoy playing Space Dodger! 🌟
