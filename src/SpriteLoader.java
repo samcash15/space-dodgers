@@ -104,6 +104,21 @@ public class SpriteLoader {
         };
     }
     
+    // Get all available main boss stations
+    public static String[] getAvailableMainBossStations() {
+        return new String[]{
+            "pixel_station_blue",
+            "pixel_station_green",
+            "pixel_station_red",
+            "pixel_station_yellow"
+        };
+    }
+    
+    // Get main boss station sprite
+    public static BufferedImage getMainBossStation(String stationType) {
+        return loadSprite("enemy_ships", stationType + ".png");
+    }
+    
     // Get all available asteroids
     public static String[] getAvailableAsteroids() {
         return new String[]{

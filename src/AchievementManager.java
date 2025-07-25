@@ -39,6 +39,11 @@ public class AchievementManager {
         addAchievement("titan_killer", "Titan Killer", "Destroy 5 boss asteroids", Achievement.AchievementType.BOSS_KILLS, 5);
         addAchievement("boss_master", "Boss Master", "Destroy 25 boss asteroids", Achievement.AchievementType.BOSS_KILLS, 25);
         
+        // Main Boss achievements
+        addAchievement("station_destroyer", "Station Destroyer", "Destroy your first main boss station", Achievement.AchievementType.MAIN_BOSS_KILLS, 1);
+        addAchievement("station_hunter", "Station Hunter", "Destroy 3 main boss stations", Achievement.AchievementType.MAIN_BOSS_KILLS, 3);
+        addAchievement("galactic_commander", "Galactic Commander", "Destroy 10 main boss stations", Achievement.AchievementType.MAIN_BOSS_KILLS, 10);
+        
         // Survival achievements
         addAchievement("survivor", "Survivor", "Reach level 5", Achievement.AchievementType.SURVIVAL, 5);
         addAchievement("veteran", "Veteran", "Reach level 10", Achievement.AchievementType.SURVIVAL, 10);
@@ -54,6 +59,37 @@ public class AchievementManager {
         addAchievement("trigger_happy", "Trigger Happy", "Fire 100 shots", Achievement.AchievementType.SHOTS_FIRED, 100);
         addAchievement("gunslinger", "Gunslinger", "Fire 500 shots", Achievement.AchievementType.SHOTS_FIRED, 500);
         addAchievement("weapons_master", "Weapons Master", "Fire 1,000 shots", Achievement.AchievementType.SHOTS_FIRED, 1000);
+        
+        // Power-up achievements
+        addAchievement("first_powerup", "Power Hungry", "Collect your first power-up", Achievement.AchievementType.POWERUPS_COLLECTED, 1);
+        addAchievement("collector", "Collector", "Collect 10 power-ups", Achievement.AchievementType.POWERUPS_COLLECTED, 10);
+        addAchievement("power_addict", "Power Addict", "Collect 25 power-ups", Achievement.AchievementType.POWERUPS_COLLECTED, 25);
+        addAchievement("power_master", "Power Master", "Collect 50 power-ups", Achievement.AchievementType.POWERUPS_COLLECTED, 50);
+        
+        // Health achievements
+        addAchievement("first_heal", "First Aid", "Heal for the first time", Achievement.AchievementType.HEALTH_HEALED, 1);
+        addAchievement("medic", "Field Medic", "Heal 500 total health", Achievement.AchievementType.HEALTH_HEALED, 500);
+        addAchievement("doctor", "Combat Doctor", "Heal 1,000 total health", Achievement.AchievementType.HEALTH_HEALED, 1000);
+        addAchievement("miracle_worker", "Miracle Worker", "Heal 2,500 total health", Achievement.AchievementType.HEALTH_HEALED, 2500);
+        
+        // Burst mode achievements
+        addAchievement("burst_novice", "Burst Novice", "Get 10 kills in burst mode", Achievement.AchievementType.BURST_KILLS, 10);
+        addAchievement("burst_expert", "Burst Expert", "Get 50 kills in burst mode", Achievement.AchievementType.BURST_KILLS, 50);
+        addAchievement("burst_master", "Burst Master", "Get 100 kills in burst mode", Achievement.AchievementType.BURST_KILLS, 100);
+        
+        // Survival time achievements
+        addAchievement("untouchable_1", "Untouchable", "Survive 30 seconds without damage", Achievement.AchievementType.NO_DAMAGE_TIME, 30);
+        addAchievement("untouchable_2", "Evasion Expert", "Survive 60 seconds without damage", Achievement.AchievementType.NO_DAMAGE_TIME, 60);
+        addAchievement("untouchable_3", "Ghost Pilot", "Survive 120 seconds without damage", Achievement.AchievementType.NO_DAMAGE_TIME, 120);
+        
+        // Close call achievements
+        addAchievement("lucky_1", "Lucky", "Survive with less than 25 health 5 times", Achievement.AchievementType.CLOSE_CALLS, 5);
+        addAchievement("lucky_2", "Cat Lives", "Survive with less than 25 health 10 times", Achievement.AchievementType.CLOSE_CALLS, 10);
+        addAchievement("lucky_3", "Death Defier", "Survive with less than 25 health 25 times", Achievement.AchievementType.CLOSE_CALLS, 25);
+        
+        // Special achievements
+        addAchievement("pacifist", "Pacifist Run", "Reach level 3 without firing a single shot", Achievement.AchievementType.PACIFIST_RUN, 3);
+        addAchievement("perfect_level", "Perfect Level", "Complete a level without taking damage", Achievement.AchievementType.SURVIVAL, 1);
     }
     
     private void addAchievement(String id, String name, String description, Achievement.AchievementType type, int targetValue) {

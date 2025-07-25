@@ -24,6 +24,7 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     private ArrayList<EnemyBullet> enemyBullets;
     private ArrayList<BackgroundStar> backgroundStars;
     private ArrayList<AchievementNotification> achievementNotifications;
+    private MainBoss mainBoss;
     private Random random;
     
     // Achievement tracking
@@ -31,8 +32,12 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     private int totalEnemyKills;
     private int totalAsteroidDestroyed;
     private int totalBossKills;
+    private int totalMainBossKills;
     private int totalDamageTaken;
     private int totalShotsFired;
+    private int noDamageTimer;
+    private boolean hadCloseCall;
+    private boolean hasFiredInThisGame;
     
     private int score;
     private int asteroidSpawnCounter;
@@ -104,7 +109,6 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     private void initGame() {
         currentState = GameState.PLAYING;
         player = new Player(WIDTH / 2 - 25, HEIGHT - 200, selectedShipType);
-        player.setHasBlaster(true); // Start with blaster ability
         player.resetHealth(); // Reset player health
         asteroids = new ArrayList<>();
         bullets = new ArrayList<>();
@@ -112,6 +116,7 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         explosions = new ArrayList<>();
         enemyShips = new ArrayList<>();
         enemyBullets = new ArrayList<>();
+        mainBoss = null; // No boss initially
         
         // Initialize achievement notifications if not already done
         if (achievementNotifications == null) {
@@ -141,8 +146,12 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         totalEnemyKills = 0;
         totalAsteroidDestroyed = 0;
         totalBossKills = 0;
+        totalMainBossKills = 0;
         totalDamageTaken = 0;
         totalShotsFired = 0;
+        noDamageTimer = 0;
+        hadCloseCall = false;
+        hasFiredInThisGame = false;
         
         // Debug: Check if achievement manager is ready
         if (achievementManager != null) {
@@ -236,15 +245,41 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
             enemyShip.draw(g);
         }
         
+        // Draw main boss
+        if (mainBoss != null) {
+            mainBoss.draw(g);
+        }
+        
         // Draw score and health
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.BOLD, 20));
         g.drawString("Score: " + score, 10, 30);
         g.drawString("Level: " + difficulty, 10, 60);
         g.drawString("Health: " + player.getCurrentHealth() + "/" + player.getMaxHealth(), 10, 90);
-        if (player.hasBlaster()) {
-            g.setColor(Color.YELLOW);
-            g.drawString("BLASTER ACTIVE", 10, 120);
+        if (player.isBurstMode()) {
+            g.setColor(Color.ORANGE);
+            g.setFont(new Font("Arial", Font.BOLD, 22));
+            g.drawString("BURST MODE ACTIVE", 10, 120);
+            g.setFont(new Font("Arial", Font.BOLD, 20));
+        }
+        
+        // Boss encounter warning
+        if (mainBoss != null) {
+            g.setColor(Color.RED);
+            g.setFont(new Font("Arial", Font.BOLD, 24));
+            String bossWarning = "⚠️ MAIN BOSS ENCOUNTER ⚠️";
+            FontMetrics fm = g.getFontMetrics();
+            int warningX = (WIDTH - fm.stringWidth(bossWarning)) / 2;
+            g.drawString(bossWarning, warningX, 40);
+            
+            // Show boss health percentage
+            g.setColor(Color.ORANGE);
+            g.setFont(new Font("Arial", Font.BOLD, 16));
+            int healthPercent = (int)((double)mainBoss.getCurrentHealth() / mainBoss.getMaxHealth() * 100);
+            String bossHealth = "Boss Health: " + healthPercent + "%";
+            fm = g.getFontMetrics();
+            int healthX = (WIDTH - fm.stringWidth(bossHealth)) / 2;
+            g.drawString(bossHealth, healthX, 65);
         }
     }
     
@@ -343,13 +378,42 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         
         // Handle shooting
         if (shootingPressed && player.canShoot()) {
-            bullets.add(new Bullet(player.getX() + player.getWidth() / 2 - 2, player.getY()));
+            if (player.isBurstMode()) {
+                // Start a burst sequence
+                player.startBurst();
+            } else {
+                // Normal single shot
+                bullets.add(new Bullet(player.getX() + player.getWidth() / 2 - 2, player.getY()));
+                totalShotsFired++;
+                hasFiredInThisGame = true;
+                if (achievementManager != null) {
+                    achievementManager.updateProgress(Achievement.AchievementType.SHOTS_FIRED, 1);
+                }
+                if (totalShotsFired == 1) {
+                    System.out.println("First shot fired! Shots: " + totalShotsFired);
+                }
+            }
+        }
+        
+        // Handle burst mode continuous shooting
+        if (player.isBurstMode() && player.shouldFireBurst() && player.getBurstShotCount() < 3) {
+            // Fire burst shots with slight spread
+            int bulletX = player.getX() + player.getWidth() / 2 - 2;
+            int bulletY = player.getY();
+            
+            if (player.getBurstShotCount() == 0) {
+                bullets.add(new Bullet(bulletX - 8, bulletY)); // Left shot
+            } else if (player.getBurstShotCount() == 1) {
+                bullets.add(new Bullet(bulletX, bulletY)); // Center shot
+            } else if (player.getBurstShotCount() == 2) {
+                bullets.add(new Bullet(bulletX + 8, bulletY)); // Right shot
+            }
+            
+            player.incrementBurstShot();
             totalShotsFired++;
+            hasFiredInThisGame = true;
             if (achievementManager != null) {
                 achievementManager.updateProgress(Achievement.AchievementType.SHOTS_FIRED, 1);
-            }
-            if (totalShotsFired == 1) {
-                System.out.println("First shot fired! Shots: " + totalShotsFired);
             }
         }
         
@@ -375,6 +439,8 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                 continue;
             }
             
+            boolean bulletRemoved = false;
+            
             // Check collision with asteroids
             Iterator<Asteroid> asteroidIter = asteroids.iterator();
             while (asteroidIter.hasNext()) {
@@ -396,21 +462,28 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                             }
                         }
                         bulletIter.remove();
+                        bulletRemoved = true;
                         break;
                     } else {
                         // Regular asteroid
                         explosions.add(new Explosion(asteroid.getX(), asteroid.getY(), asteroid.getSize()));
                         asteroidIter.remove();
                         bulletIter.remove();
+                        bulletRemoved = true;
                         score += 25; // Extra points for shooting
                         totalAsteroidDestroyed++;
                         if (achievementManager != null) {
                             achievementManager.updateProgress(Achievement.AchievementType.ASTEROID_DESTROYED, 1);
+                            // Track burst mode kills
+                            if (player.isBurstMode()) {
+                                achievementManager.updateProgress(Achievement.AchievementType.BURST_KILLS, 1);
+                            }
                         }
                         break;
                     }
                 }
             }
+            if (bulletRemoved) continue;
             
             // Check collision with enemy ships
             Iterator<EnemyShip> enemyIter = enemyShips.iterator();
@@ -427,11 +500,37 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                         System.out.println("Enemy ship killed! Total enemy kills: " + totalEnemyKills);
                         if (achievementManager != null) {
                             achievementManager.updateProgress(Achievement.AchievementType.ENEMY_KILLS, 1);
+                            // Track burst mode kills
+                            if (player.isBurstMode()) {
+                                achievementManager.updateProgress(Achievement.AchievementType.BURST_KILLS, 1);
+                            }
                         }
                     }
                     bulletIter.remove();
+                    bulletRemoved = true;
                     break;
                 }
+            }
+            if (bulletRemoved) continue;
+            
+            // Check collision with main boss
+            if (mainBoss != null && bullet.getBounds().intersects(mainBoss.getBounds())) {
+                if (mainBoss.takeDamage(10)) { // Each bullet does 10 damage to boss
+                    // Boss destroyed
+                    explosions.add(new Explosion(mainBoss.getX(), mainBoss.getY(), 
+                                               Math.max(mainBoss.getWidth(), mainBoss.getHeight())));
+                    int points = mainBoss.getPointValue(); // Get points before removing boss
+                    score += points; // 500 points
+                    totalMainBossKills++;
+                    if (achievementManager != null) {
+                        achievementManager.updateProgress(Achievement.AchievementType.MAIN_BOSS_KILLS, 1);
+                    }
+                    System.out.println("MAIN BOSS DEFEATED! Points: " + points);
+                    mainBoss = null; // Remove boss
+                }
+                bulletIter.remove();
+                bulletRemoved = true;
+                break;
             }
         }
         
@@ -462,6 +561,16 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                     gameOver = true;
                 }
                 totalDamageTaken += damage;
+                noDamageTimer = 0; // Reset no damage timer
+                
+                // Check for close calls
+                if (player.getCurrentHealth() > 0 && player.getCurrentHealth() < 25 && !hadCloseCall) {
+                    hadCloseCall = true;
+                    if (achievementManager != null) {
+                        achievementManager.updateProgress(Achievement.AchievementType.CLOSE_CALLS, 1);
+                    }
+                }
+                
                 if (achievementManager != null) {
                     achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, damage);
                 }
@@ -486,10 +595,28 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
             // Check collision with player
             if (player.getBounds().intersects(powerUp.getBounds())) {
                 if (powerUp.getType() == PowerUp.PowerUpType.BLASTER) {
-                    player.setHasBlaster(true);
+                    player.activateBurstMode();
+                    System.out.println("Burst Mode power-up collected! 3-round burst for 10 seconds!");
+                } else if (powerUp.getType() == PowerUp.PowerUpType.MEDKIT) {
+                    // Heal player by 50 health (half of max health)
+                    int healAmount = 50;
+                    int oldHealth = player.getCurrentHealth();
+                    player.heal(healAmount);
+                    int actualHeal = player.getCurrentHealth() - oldHealth;
+                    System.out.println("Medkit collected! Healed " + actualHeal + " HP");
+                    
+                    // Track health healed
+                    if (achievementManager != null && actualHeal > 0) {
+                        achievementManager.updateProgress(Achievement.AchievementType.HEALTH_HEALED, actualHeal);
+                    }
                 }
                 powerUpIter.remove();
                 score += 50; // Bonus points for power-up
+                
+                // Track power-up collection
+                if (achievementManager != null) {
+                    achievementManager.updateProgress(Achievement.AchievementType.POWERUPS_COLLECTED, 1);
+                }
             }
         }
         
@@ -511,6 +638,16 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                     gameOver = true;
                 }
                 totalDamageTaken += 50;
+                noDamageTimer = 0; // Reset no damage timer
+                
+                // Check for close calls
+                if (player.getCurrentHealth() > 0 && player.getCurrentHealth() < 25 && !hadCloseCall) {
+                    hadCloseCall = true;
+                    if (achievementManager != null) {
+                        achievementManager.updateProgress(Achievement.AchievementType.CLOSE_CALLS, 1);
+                    }
+                }
+                
                 if (achievementManager != null) {
                     achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, 50);
                 }
@@ -547,10 +684,47 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
                     gameOver = true;
                 }
                 totalDamageTaken += 50;
+                noDamageTimer = 0; // Reset no damage timer
+                
+                // Check for close calls
+                if (player.getCurrentHealth() > 0 && player.getCurrentHealth() < 25 && !hadCloseCall) {
+                    hadCloseCall = true;
+                    if (achievementManager != null) {
+                        achievementManager.updateProgress(Achievement.AchievementType.CLOSE_CALLS, 1);
+                    }
+                }
+                
                 if (achievementManager != null) {
                     achievementManager.updateProgress(Achievement.AchievementType.DAMAGE_TAKEN, 50);
                 }
                 enemyBulletIter.remove();
+            }
+        }
+        
+        // Update main boss
+        if (mainBoss != null) {
+            mainBoss.update(WIDTH, HEIGHT);
+            
+            // Check collision with player - boss contact causes instant death
+            if (player.getBounds().intersects(mainBoss.getBounds())) {
+                player.takeDamage(player.getMaxHealth()); // Instant death
+                gameOver = true;
+            }
+            
+            // Boss shooting
+            if (mainBoss.canShoot()) {
+                int bulletX = mainBoss.getX() + mainBoss.getWidth() / 2 - 3;
+                int bulletY = mainBoss.getY() + mainBoss.getHeight();
+                String laserType = mainBoss.getLaserType();
+                enemyBullets.add(new EnemyBullet(bulletX, bulletY, laserType));
+                
+                // Boss can shoot multiple bullets in phase 3
+                if (mainBoss.getPhase() >= 3) {
+                    // Left bullet
+                    enemyBullets.add(new EnemyBullet(bulletX - 30, bulletY, laserType));
+                    // Right bullet
+                    enemyBullets.add(new EnemyBullet(bulletX + 30, bulletY, laserType));
+                }
             }
         }
         
@@ -565,7 +739,19 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         // Spawn power-ups
         powerUpSpawnCounter++;
         if (powerUpSpawnCounter >= 300) { // Spawn every ~5 seconds
-            if (random.nextInt(100) < 30 && !player.hasBlaster()) { // 30% chance when player doesn't have blaster
+            // Always have a chance to spawn power-ups
+            boolean shouldSpawn = false;
+            
+            // Higher chance if player needs health
+            if (player.getCurrentHealth() < player.getMaxHealth() * 0.7) {
+                shouldSpawn = random.nextInt(100) < 50; // 50% chance when health is below 70%
+            } else if (!player.isBurstMode()) {
+                shouldSpawn = random.nextInt(100) < 40; // 40% chance when no burst mode
+            } else {
+                shouldSpawn = random.nextInt(100) < 25; // 25% base chance
+            }
+            
+            if (shouldSpawn) {
                 spawnPowerUp();
             }
             powerUpSpawnCounter = 0;
@@ -590,14 +776,38 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         }
         
         // Increase difficulty
-        if (score > 0 && score % 200 == 0) {
-            difficulty = score / 200 + 1;
+        int newDifficulty = score / 200 + 1;
+        
+        // Check if we've reached a new 10th level for boss spawning
+        if (newDifficulty != difficulty && newDifficulty % 10 == 0 && mainBoss == null) {
+            spawnMainBoss();
+        }
+        
+        difficulty = newDifficulty;
+        
+        // Update no damage timer
+        noDamageTimer++;
+        if (noDamageTimer % 60 == 0) { // Check every second
+            int seconds = noDamageTimer / 60;
+            if (achievementManager != null) {
+                achievementManager.setProgress(Achievement.AchievementType.NO_DAMAGE_TIME, seconds);
+            }
+        }
+        
+        // Reset close call flag when health improves
+        if (player.getCurrentHealth() >= 25) {
+            hadCloseCall = false;
         }
         
         // Update achievement progress during gameplay
         if (achievementManager != null) {
             achievementManager.setProgress(Achievement.AchievementType.SCORE, score);
             achievementManager.setProgress(Achievement.AchievementType.SURVIVAL, difficulty);
+            
+            // Check pacifist achievement - only if we haven't fired and are at level 3+
+            if (!hasFiredInThisGame && difficulty >= 3) {
+                achievementManager.setProgress(Achievement.AchievementType.PACIFIST_RUN, difficulty);
+            }
         }
     }
     
@@ -650,7 +860,16 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     
     private void spawnPowerUp() {
         int x = random.nextInt(WIDTH - 30);
-        powerUps.add(new PowerUp(x, -30, PowerUp.PowerUpType.BLASTER));
+        // Randomly choose between blaster and medkit
+        PowerUp.PowerUpType type;
+        if (player.getCurrentHealth() < player.getMaxHealth() * 0.5) {
+            // Higher chance of medkit when health is low
+            type = random.nextInt(100) < 70 ? PowerUp.PowerUpType.MEDKIT : PowerUp.PowerUpType.BLASTER;
+        } else {
+            // Equal chance when health is good
+            type = random.nextInt(100) < 50 ? PowerUp.PowerUpType.MEDKIT : PowerUp.PowerUpType.BLASTER;
+        }
+        powerUps.add(new PowerUp(x, -30, type));
     }
     
     private void spawnEnemyShip() {
@@ -658,6 +877,17 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
         String[] enemyTypes = SpriteLoader.getAvailableEnemyShips();
         String enemyType = enemyTypes[random.nextInt(enemyTypes.length)];
         enemyShips.add(new EnemyShip(x, -40, enemyType));
+    }
+    
+    private void spawnMainBoss() {
+        // Only spawn if no boss exists
+        if (mainBoss == null) {
+            int x = WIDTH / 2 - 60; // Center the boss
+            String[] stationTypes = SpriteLoader.getAvailableMainBossStations();
+            String stationType = stationTypes[random.nextInt(stationTypes.length)];
+            mainBoss = new MainBoss(x, -120, stationType);
+            System.out.println("MAIN BOSS SPAWNED at level " + difficulty + "! Station type: " + stationType);
+        }
     }
     
     private boolean checkCollision(Player player, Asteroid asteroid) {
@@ -734,6 +964,18 @@ public class SpaceDodger extends JPanel implements ActionListener, KeyListener {
     
     public static void main(String[] args) {
         JFrame frame = new JFrame("Space Dodger");
+        
+        // Set the game icon
+        try {
+            // Use the blue player ship as the icon
+            BufferedImage iconImage = SpriteLoader.getPlayerShip("pixel_ship_blue");
+            if (iconImage != null) {
+                frame.setIconImage(iconImage);
+            }
+        } catch (Exception e) {
+            System.out.println("Could not load game icon: " + e.getMessage());
+        }
+        
         SpaceDodger game = new SpaceDodger();
         frame.add(game);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

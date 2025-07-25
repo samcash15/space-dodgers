@@ -26,16 +26,38 @@ A thrilling 2D space dodging game built with Java Swing featuring sprite-based g
 
 ## ⚙️ How to Run
 
+### Option 1: Easy Launch (Recommended) 🚀
 1. Make sure you have Java installed (Java 8 or higher) ☕
-2. Navigate to the `src` directory 📁
-3. Compile the game: 🔧
+2. Run the setup (first time only): 📁
+   ```bash
+   bash setup.sh
    ```
+3. Launch the game: 🎮
+   ```bash
+   ./run.sh
+   ```
+
+### Option 2: Alternative Launch 🎮
+```bash
+bash start.sh
+```
+
+### Option 3: Manual Launch 🔧
+1. Navigate to the `src` directory 📁
+2. Compile the game:
+   ```bash
    javac *.java
    ```
-4. Run the game: 🎮
-   ```
+3. Run the game:
+   ```bash
    java SpaceDodger
    ```
+
+### 🛠️ Troubleshooting
+If you get "Permission denied" when running `./run.sh`, run:
+```bash
+chmod +x run.sh
+```
 
 ## ✨ Game Features
 

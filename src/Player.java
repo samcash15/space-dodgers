@@ -8,7 +8,7 @@ public class Player {
     private int speed = 8;
     private boolean movingLeft = false;
     private boolean movingRight = false;
-    private boolean hasBlaster = false;
+    private boolean hasBlaster = true; // Always can shoot, but normal is single shot
     private long lastShotTime = 0;
     private long shotCooldown = 250; // milliseconds between shots
     private String shipType;
@@ -18,6 +18,10 @@ public class Player {
     private int currentHealth = 100;
     private boolean hit = false;
     private int hitTimer = 0;
+    private boolean burstMode = false;
+    private int burstTimer = 0; // Frames remaining for burst mode
+    private int burstShotCount = 0; // Tracks shots in current burst
+    private int burstShotDelay = 0; // Delay between burst shots
     
     public Player(int x, int y, String shipType) {
         this.x = x;
@@ -50,6 +54,20 @@ public class Player {
             if (hitTimer <= 0) {
                 hit = false;
             }
+        }
+        
+        // Update burst mode timer
+        if (burstTimer > 0) {
+            burstTimer--;
+            if (burstTimer == 0) {
+                burstMode = false;
+                System.out.println("Burst mode expired!");
+            }
+        }
+        
+        // Update burst shot delay
+        if (burstShotDelay > 0) {
+            burstShotDelay--;
         }
     }
     
@@ -196,6 +214,43 @@ public class Player {
         hit = true;
         hitTimer = 10; // Flash for 10 frames
         return currentHealth <= 0;
+    }
+    
+    public void heal(int amount) {
+        currentHealth = Math.min(currentHealth + amount, maxHealth);
+    }
+    
+    public void activateBurstMode() {
+        burstMode = true;
+        burstTimer = 600; // 10 seconds at 60 FPS
+        System.out.println("BURST MODE ACTIVATED for 10 seconds!");
+    }
+    
+    public boolean isBurstMode() {
+        return burstMode;
+    }
+    
+    public boolean shouldFireBurst() {
+        return burstMode && burstShotDelay == 0;
+    }
+    
+    public void startBurst() {
+        burstShotCount = 0;
+        burstShotDelay = 5; // Small delay between burst shots
+    }
+    
+    public int getBurstShotCount() {
+        return burstShotCount;
+    }
+    
+    public void incrementBurstShot() {
+        burstShotCount++;
+        if (burstShotCount >= 3) {
+            burstShotCount = 0;
+            burstShotDelay = 15; // Delay before next burst
+        } else {
+            burstShotDelay = 5; // Small delay between shots in burst
+        }
     }
     
     public int getCurrentHealth() {

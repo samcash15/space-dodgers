@@ -8,7 +8,8 @@ public class Achievement {
     private AchievementType type;
     
     public enum AchievementType {
-        SCORE, ENEMY_KILLS, ASTEROID_DESTROYED, SURVIVAL, BOSS_KILLS, DAMAGE_TAKEN, SHOTS_FIRED, ACCURACY, STREAK
+        SCORE, ENEMY_KILLS, ASTEROID_DESTROYED, SURVIVAL, BOSS_KILLS, MAIN_BOSS_KILLS, DAMAGE_TAKEN, SHOTS_FIRED, 
+        ACCURACY, STREAK, POWERUPS_COLLECTED, HEALTH_HEALED, BURST_KILLS, NO_DAMAGE_TIME, CLOSE_CALLS, PACIFIST_RUN
     }
     
     public Achievement(String id, String name, String description, AchievementType type, int targetValue) {
